@@ -2,12 +2,9 @@ module Com where
 
 import           Data.Set          (Set)
 import qualified Data.Set          as Se
-import           Hsmtlib
 import           Hsmtlib.HighLevel
-import           Hsmtlib.Solver    as Slv
 import           SMTLib2
 import           SMTLib2.Array
-import           SMTLib2.BitVector
 import           SMTLib2.Core      as C
 import           SMTLib2.Int
 import           Syntax            hiding (Expr)
@@ -17,8 +14,8 @@ getAsserts :: Set LogExp -> Set Expr
 getAsserts = Se.map createSexpr
 
 getVars :: Set LogExp -> Set String
-getVars = Se.foldr (fun) Se.empty
-        where fun =Se.union.getVarSexpr 
+getVars = Se.foldr fun Se.empty
+        where fun =Se.union.getVarSexpr
 
 -- Creates the expressions for the assertions
 
@@ -37,7 +34,7 @@ logBinToExpr Imp expr1 expr2 = createSexpr expr1 ==> createSexpr expr2
 boolToExpr :: Bool -> Expr
 boolToExpr True = true
 boolToExpr False = false
- 
+
 ineBinToExpr :: IneOp -> AExp -> AExp -> Expr
 ineBinToExpr Equal aexp1 aexp2 =  aExpToExpr aexp1 ===  aExpToExpr aexp2
 ineBinToExpr Diff aexp1 aexp2 = aExpToExpr aexp1 =/=  aExpToExpr aexp2
@@ -70,18 +67,18 @@ aValueToExpr (AArray name pos) = select (constant name) (literal pos)
 -- Gets a Set of variables
 
 getVarSexpr :: LogExp -> Set String
-getVarSexpr (BConst b) = Se.empty
+getVarSexpr (BConst _) = Se.empty
 getVarSexpr (Not a) =  getVarSexpr a
-getVarSexpr (LogBin logop expr1 expr2) = 
+getVarSexpr (LogBin _ expr1 expr2) =
     Se.union (getVarSexpr expr1)  (getVarSexpr expr2)
-getVarSexpr (IneBin ineop axp1 axp2) =
+getVarSexpr (IneBin _ axp1 axp2) =
     Se.union (getVarAexp axp1) (getVarAexp axp2)
 
 
 getVarAexp :: AExp -> Set String
-getVarAexp (AExp aop aexp1 aexp2) = 
+getVarAexp (AExp _ aexp1 aexp2) =
     Se.union (getVarAexp aexp1) (getVarAexp aexp2)
-getVarAexp (SValue avalue) = 
+getVarAexp (SValue avalue) =
     getVarAvalue avalue
 
 

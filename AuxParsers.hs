@@ -7,7 +7,7 @@ import           Text.ParserCombinators.Parsec.Char       (char, digit, letter,
                                                            string)
 
 import           Text.ParserCombinators.Parsec.Combinator (many1)
-
+import           Control.Applicative
 
 parO :: ParsecT String u Identity String
 parO = string "("
@@ -61,10 +61,10 @@ squareC :: ParsecT String u Identity Char
 squareC = char ']'
 
 integer :: ParsecT String u Identity Int
-integer  = fmap read $ many1 digit
+integer  = read <$> many1 digit
 
 symbol :: ParsecT String u Identity String
-symbol = (many1 letter) >>= symb'
+symbol = many1 letter >>= symb'
 
 
 symb' :: String -> ParsecT String u Identity String
@@ -100,7 +100,6 @@ false = string "False"
 
 sep :: ParsecT String u Identity Char
 sep = char ';'
-
 
 while :: ParsecT String u Identity String
 while = string "while"

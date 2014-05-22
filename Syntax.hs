@@ -1,6 +1,6 @@
 module Syntax where
 
-import Data.List(intercalate)
+import           Data.List (intercalate)
 
 data Source = Source LogExp LogExp [Expr] -- pre pos exprs
 
@@ -17,9 +17,9 @@ data ArrayVal = ValArray String Int -- c[4]
               | NArray [Int] -- {1,2,3,4}
               | None
 
-data LogExp = BConst Bool 
+data LogExp = BConst Bool
             | Not LogExp
-            | LogBin LogOp LogExp LogExp 
+            | LogBin LogOp LogExp LogExp
             | IneBin IneOp AExp AExp
             deriving(Ord, Eq)
 
@@ -42,32 +42,32 @@ data AValue = ANum Int
 
 instance Show Source where
   show (Source pre pos exprs) = show pre ++ "\n" ++ fShow exprs ++ show pos
-                                where fShow = (intercalate "  ").(fmap show) 
+                                where fShow = intercalate "  ".fmap show
 
 
 instance Show Expr where
   show (ExprAssign assign) = show assign ++";\n"
-  show (ExprIf cond expr1 expr2) = "if( " ++ show cond ++ " ){\n  " 
-                                 ++ fShow expr1 ++ "}else{\n  " 
+  show (ExprIf cond expr1 expr2) = "if( " ++ show cond ++ " ){\n  "
+                                 ++ fShow expr1 ++ "}else{\n  "
                                  ++ fShow expr2 ++ "}\n"
-                                 where fShow = (intercalate "  ").(fmap show) 
+                                 where fShow = intercalate "  ".fmap show
 
 
   show (ExprWhile cond inv expr) = "while( " ++ show cond ++ "){\n  "
                                     ++ "inv: " ++ show inv  ++";\n  "
                                     ++ fShow expr ++ "}\n"
-                                 where fShow = (intercalate "  ").(fmap show) 
+                                 where fShow = intercalate "  ".fmap show
 
 instance Show Assign where
   show (AssignVar var expr) = var ++" = " ++ show expr
-  show (AssignArray name pos elems) = name ++ "[" ++ show pos ++ "]" 
-                                      ++ show elems 
+  show (AssignArray name pos elems) = name ++ "[" ++ show pos ++ "]"
+                                      ++ show elems
 
 instance Show ArrayVal where
-  show (ValArray name val) = " = " ++ name ++ "[" ++ show val ++ "]" 
+  show (ValArray name val) = " = " ++ name ++ "[" ++ show val ++ "]"
   show (ValElem arrayElem) =" = " ++ show arrayElem
-  show (NArray elems )= " = " ++ 
-                            "{" ++  (intercalate ", "(fmap show elems)) ++ "}"
+  show (NArray elems )= " = " ++
+                            "{" ++  intercalate ", " (fmap show elems) ++ "}"
   show None = ""
 
 
@@ -91,9 +91,9 @@ instance Show AValue where
 instance Show LogExp where
     show (BConst bool) = show bool
     show (Not logexp) = "not " ++ show logexp
-    show (LogBin op exp1 exp2) = 
+    show (LogBin op exp1 exp2) =
         "( " ++ show exp1 ++ show op ++ show exp2 ++ " )"
-    show (IneBin op exp1 exp2) = 
+    show (IneBin op exp1 exp2) =
         "( " ++ show exp1 ++ show op ++ show exp2 ++ " )"
 
 instance Show LogOp where

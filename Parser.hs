@@ -1,15 +1,14 @@
 module Parser where
 
-import           AuxParsers                               as Aux
-import           Control.Applicative                      hiding (many, (<|>))
+import           AuxParsers                    as Aux
+import           Control.Applicative           hiding (many, (<|>))
 import           Control.Monad
 import           Data.Functor.Identity
 import           Syntax
-import           Text.Parsec.Expr                         as Pex
-import           Text.Parsec.Prim                         as Prim
+import           Text.Parsec.Expr              as Pex
+import           Text.Parsec.Prim              as Prim
 import           Text.ParserCombinators.Parsec
-import           Text.ParserCombinators.Parsec.Combinator
-import           Text.ParserCombinators.Parsec.Prim
+
 
 
 parseFile :: String -> IO (Either String Source)
@@ -17,16 +16,16 @@ parseFile str = do
     let result = Prim.parse parseSource "error.hs" $ clearS str
     case result of
       Left err -> return $ Left $ show err
-      Right val -> return $ Right $ val
+      Right val -> return $ Right val
 
 -- Parse Source
 
 parseSource :: ParsecT String u Identity Source
 parseSource = do
-    pre <- parsePre
+    preC <- parsePre
     exprs <- many $ Prim.try parseExpr
-    pos <- parsePos
-    return $ Source pre pos exprs
+    posC <- parsePos
+    return $ Source preC posC exprs
 
 
 
@@ -83,7 +82,7 @@ parseAssign = do
     maybeArray <- parseMaybeArray
     case maybeArray of
         Nothing -> parseAssignVar name
-        (Just pos) -> parseAssignArray name pos
+        Just pos -> parseAssignArray name pos
 
 parseMaybeArray :: ParsecT String u Identity (Maybe Int)
 parseMaybeArray = optionMaybe $ squareO *> integer <* squareC
