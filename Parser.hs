@@ -275,4 +275,5 @@ clearS :: String -> String
 clearS [] = []
 clearS (x:xs) | x == ' ' = clearS xs
               | x == '\n' = clearS xs
+              | x == '\t' = clearS xs
               | otherwise = x:clearS xs

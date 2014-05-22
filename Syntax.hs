@@ -1,7 +1,6 @@
 module Syntax where
 
 import           Data.List (intercalate)
-
 data Source = Source LogExp LogExp [Expr] -- pre pos exprs
 
 data Expr = ExprAssign Assign
@@ -15,7 +14,7 @@ data Assign = AssignVar String AExp -- b = 2+3 | 2 | 2*(4/[2]) - a
 data ArrayVal = ValArray String Int -- c[4]
               | ValElem Int --  Int
               | NArray [Int] -- {1,2,3,4}
-              | None
+              | None -- O None é para quando se aloca um array.
 
 data LogExp = BConst Bool
             | Not LogExp

@@ -74,7 +74,7 @@ symb' "else" = unexpected "Private Word else!"
 symb' "inv" = unexpected "Private Word inv!"
 symb' "pre" = unexpected "Private Word pre!"
 symb' "pos" = unexpected "Private Word pos!"
-symb' "not" = unexpected "Private Word not!"
+symb' "~" = unexpected "Private Word not!"
 symb' val = return  val
 
 pAnd :: ParsecT String u Identity String
@@ -87,7 +87,7 @@ pImp :: ParsecT String u Identity String
 pImp = string "imp"
 
 pNot :: ParsecT String u Identity String
-pNot = string "not"
+pNot = string "~"
 
 eq :: ParsecT String u Identity Char
 eq = char '='

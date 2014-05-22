@@ -56,13 +56,7 @@ wpIf cond exps1 exps2 conExp = LogBin And and1 and2
 -- calculation of weakest precondition assign
 
 wpAssign :: Assign -> LogExp -> LogExp
--- no smt criar variavel nova e assert que essa variavel e igual
--- ao valor da expressao
 wpAssign (AssignVar nameVar condVar) pos = wpAVLogExp nameVar condVar pos
---Criação de um array declare do array e assert na posicao que é igual a ...
---criação de um array com elementos ? fazer algo com istox
-wpAssign (AssignArray _ _ None) posC = posC
-wpAssign (AssignArray _ _ (NArray _)) posC = posC -- ???
 wpAssign (AssignArray name npos val) posC = wpAALogExp name npos val posC
 
 
@@ -87,15 +81,22 @@ wpAAAexp name pos val (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
                               wpExp2 = wpAAAexp name pos val exp2
 
 wpAAAValue :: String -> Int -> ArrayVal -> AValue -> AValue
-wpAAAValue name pos val (AArray namePA posPA) | name == namePA && pos == posPA =
-                                                    arrayValToAValue val
-                                              | otherwise = AArray namePA posPA
+wpAAAValue name pos val (AArray namePA posPA) = 
+  arrayValToAValue val name pos namePA posPA 
 wpAAAValue _ _ _ avalue = avalue
 
-arrayValToAValue :: ArrayVal -> AValue
-arrayValToAValue (ValArray str n) = AArray str n
-arrayValToAValue (ValElem n) = ANum n
 
+arrayValToAValue ::  ArrayVal -> String -> Int -> String -> Int -> AValue
+arrayValToAValue (ValArray str n) name pos namePA  posPA
+  | name == namePA && pos == posPA =  AArray str n
+  | otherwise = AArray namePA posPA
+arrayValToAValue (ValElem n)  name pos namePA posPA 
+  | name == namePA && pos == posPA = ANum n
+  | otherwise = AArray namePA posPA
+arrayValToAValue (NArray vals) name pos namePA posPA
+  | name == namePA && posPA <= pos = ANum (vals !! posPA)
+  | otherwise = ANum (-999)
+arrayValToAValue None _ _ namePA posPA = AArray namePA posPA
 
 --Weakest precondition Assignment Var
 wpAVLogExp :: String -> AExp -> LogExp -> LogExp
