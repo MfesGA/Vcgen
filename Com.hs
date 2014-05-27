@@ -10,6 +10,7 @@ import           SMTLib2.Int
 import           Syntax            as S
 
 
+
 getAsserts :: Set LogExp -> Set SL.Expr
 getAsserts = Se.map createSexpr
 
@@ -26,6 +27,8 @@ getArrays (Source _ _ stmts) = getArrayLExpr stmts
 createSexpr :: LogExp -> SL.Expr
 createSexpr (BConst b) = boolToExpr b
 createSexpr (Not a) =  C.not (createSexpr a)
+--createSexpr (Forall s expr) = forall s (creteSexpr expr)
+--createSexpr (Exists s expr) = exists s (createSexpr expr)
 createSexpr (LogBin logop expr1 expr2) = logBinToExpr logop expr1 expr2
 createSexpr (IneBin ineop axp1 axp2) = ineBinToExpr ineop axp1 axp2
 
@@ -50,22 +53,22 @@ ineBinToExpr Geq aexp1 aexp2 = nGeq (aExpToExpr aexp1) (aExpToExpr aexp2)
 
 aExpToExpr :: AExp -> SL.Expr
 aExpToExpr (AExp aop aexp1 aexp2) = aOpToExpr aop aexp1 aexp2
-aExpToExpr (SValue avalue) = aValueToExpr avalue
+aExpToExpr (SAValue avalue) = aValueToExpr avalue
 
 
 aOpToExpr :: AOp -> AExp -> AExp -> SL.Expr
-aOpToExpr Add  aexp1 aexp2 = nAdd (aExpToExpr aexp1) (aExpToExpr aexp2)
+aOpToExpr Add aexp1 aexp2 = nAdd (aExpToExpr aexp1) (aExpToExpr aexp2)
 aOpToExpr Sub aexp1 aexp2 = nSub (aExpToExpr aexp1) (aExpToExpr aexp2)
 aOpToExpr Div aexp1 aexp2 = nDiv (aExpToExpr aexp1) (aExpToExpr aexp2)
 aOpToExpr Mul aexp1 aexp2 = nMul (aExpToExpr aexp1) (aExpToExpr aexp2)
+aOpToExpr Mod aexp1 aexp2 = nMod (aExpToExpr aexp1) (aExpToExpr aexp2)
 
 
-
-aValueToExpr :: AValue -> SL.Expr
-aValueToExpr (ANum n) = literal n
-aValueToExpr (AVar v) = constant v
-aValueToExpr (AArray name pos) = select (constant name) (literal pos)
-
+aValueToExpr :: VarValue -> SL.Expr
+aValueToExpr (VVNum n) = literal n
+aValueToExpr (VVar v) = constant v
+aValueToExpr (VIArray name pos) = select (constant name) (literal pos)
+aValueToExpr (VVArray name pos) = select (constant name) (constant pos)
 
 
 -- Gets a Set of variables
@@ -73,6 +76,8 @@ aValueToExpr (AArray name pos) = select (constant name) (literal pos)
 getVarSexpr :: LogExp -> Set String
 getVarSexpr (BConst _) = Se.empty
 getVarSexpr (Not a) =  getVarSexpr a
+getVarSexpr (S.Forall _ expr) = getVarSexpr expr
+getVarSexpr (S.Exists _ expr) = getVarSexpr expr
 getVarSexpr (LogBin _ expr1 expr2) =
     Se.union (getVarSexpr expr1)  (getVarSexpr expr2)
 getVarSexpr (IneBin _ axp1 axp2) =
@@ -82,13 +87,13 @@ getVarSexpr (IneBin _ axp1 axp2) =
 getVarAexp :: AExp -> Set String
 getVarAexp (AExp _ aexp1 aexp2) =
     Se.union (getVarAexp aexp1) (getVarAexp aexp2)
-getVarAexp (SValue avalue) =
+getVarAexp (SAValue avalue) =
     getVarAvalue avalue
 
 
 
-getVarAvalue :: AValue -> Set String
-getVarAvalue (AVar v) = Se.singleton v
+getVarAvalue :: VarValue-> Set String
+getVarAvalue (VVar v) = Se.singleton v
 getVarAvalue _ = Se.empty
 
 
@@ -99,13 +104,15 @@ getArrayLExpr = foldr (Se.union . getArrayExpr) Se.empty
 
 getArrayExpr :: S.Expr -> Set String
 getArrayExpr (ExprIf _ expr1 expr2) =
-	Se.union (getArrayLExpr expr1) (getArrayLExpr expr2)
+    Se.union (getArrayLExpr expr1) (getArrayLExpr expr2)
 getArrayExpr (ExprWhile _ _ expr) = getArrayLExpr expr
-getArrayExpr (ExprAssign  assign ) = getArrayAssign assign
+getArrayExpr (ExprAlloc alloc ) = getArrayAlloc alloc
+getArrayExpr _ = Se.empty
 
 
-getArrayAssign :: Assign -> Set String
-getArrayAssign (AssignVar _ _) = Se.empty
-getArrayAssign (AssignArray str _ None) = Se.singleton str
-getArrayAssign (AssignArray str _ (NArray _)) = Se.singleton str
-getArrayAssign AssignArray{} = Se.empty
+getArrayAlloc :: Alloc -> Set String
+getArrayAlloc (ANArray name _) = Se.singleton name
+getArrayAlloc _ = Se.empty
+
+
+

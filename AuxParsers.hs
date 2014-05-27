@@ -9,11 +9,17 @@ import           Text.ParserCombinators.Parsec.Char       (char, digit, letter,
 import           Text.ParserCombinators.Parsec.Combinator (many1)
 import           Control.Applicative
 
+pVar :: ParsecT String u Identity String
+pVar = string "var"
+
 parO :: ParsecT String u Identity String
 parO = string "("
 
 parC :: ParsecT String u Identity String
 parC = string ")"
+
+mod :: ParsecT String u Identity Char
+mod = char '%'
 
 sum :: ParsecT String u Identity Char
 sum = char '+'
@@ -29,6 +35,12 @@ mul = char '*'
 
 div :: ParsecT String u Identity Char
 div = char '/'
+
+forall :: ParsecT String u Identity String
+forall = string "forall"
+
+exists :: ParsecT String u Identity String
+exists = string "exists"
 
 equal :: ParsecT String u Identity String
 equal = string "=="
@@ -74,8 +86,16 @@ symb' "else" = unexpected "Private Word else!"
 symb' "inv" = unexpected "Private Word inv!"
 symb' "pre" = unexpected "Private Word pre!"
 symb' "pos" = unexpected "Private Word pos!"
-symb' "~" = unexpected "Private Word not!"
+symb' "not" = unexpected "Private Word not!"
+symb' "forall" = unexpected "Private Word not!"
+symb' "exists" = unexpected "Private Word exists" 
+symb' "{" = unexpected "Private Char {"
+symb' "[" = unexpected "Private Char ["
+symb' "var" = unexpected "Private Word var."
 symb' val = return  val
+
+
+ 
 
 pAnd :: ParsecT String u Identity String
 pAnd = string "&&"

@@ -20,15 +20,15 @@ import           Control.Monad
 
 check :: Solver -> (String, Expr) -> IO SatResult
 check solver (psexpr,sexpr) = do
-    push solver 1
-    assert solver $ not  sexpr
+    _ <- push solver 1
+    _ <- assert solver $ not  sexpr
     val <- checkSat solver
     case val of
         Unsat -> print $ "The condition: " ++ psexpr ++ " is valid."
         SUError err -> print $ "Error: " ++ err
         _ ->  putStrLn ("The condition: " ++ psexpr ++ " is not valid." ) >> 
                 askForModel solver
-    pop solver 1 
+    _ <- pop solver 1 
     return val
  
 
@@ -42,7 +42,7 @@ askForModel' _ 'n' = return ()
 askForModel' s 'y' = putStrLn "Insira o nome da variavel." >>
                    putStrLn "Insira a pos do array se for o caso." >>
                    putStrLn "e.g.: a | x 2\n" >> 
-                   getLine >> getLine >>= (showValue s).words
+                   getLine >> getLine >>= showValue s.words
 askForModel' _ _ = print "Opção errada!"
 
 
@@ -94,7 +94,7 @@ runSolver source = do
     let asserts = fmap createSexpr (Se.toList exprs) 
     let zipAsserts = zip (fmap  show (Se.toList exprs)) asserts
     solver <- startSolver Z3 Online QF_AUFLIA Nothing Nothing
-    produceModels solver
+    _ <- produceModels solver
     -- declare constants
     mapDeclConst solver (Se.toList.getVars $ exprs) tInt 
     -- declare arrays
@@ -121,8 +121,8 @@ run = putStrLn "Insira o caminho para o ficheiro." >>
 
 
 runProgram :: String -> IO ()
-runProgram path = do
-    fHandle <- openFile path ReadMode 
+runProgram fpath = do
+    fHandle <- openFile fpath ReadMode 
     file <- hGetContents fHandle >>= parseFile 
     case file of
         Left err -> print err >> hClose fHandle

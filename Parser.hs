@@ -1,15 +1,17 @@
 module Parser where
 
-import           AuxParsers                    as Aux
 import           Control.Applicative           hiding (many, (<|>))
 import           Control.Monad
 import           Data.Functor.Identity
 import           Syntax
 import           Text.Parsec.Expr              as Pex
-import           Text.Parsec.Prim              as Prim
+import           Text.Parsec.Prim      as Prim hiding(try)
 import           Text.ParserCombinators.Parsec
+import           AuxParsers as Aux
 
-
+teste :: IO ()
+teste =  forever $ 
+    getLine >>= readFile >>= parseTest parseSource.clearS >>= print
 
 parseFile :: String -> IO (Either String Source)
 parseFile str = do
@@ -18,118 +20,126 @@ parseFile str = do
       Left err -> return $ Left $ show err
       Right val -> return $ Right val
 
+
 -- Parse Source
 
 parseSource :: ParsecT String u Identity Source
 parseSource = do
     preC <- parsePre
-    exprs <- many $ Prim.try parseExpr
+    exprs <- many $ try parseExpr
     posC <- parsePos
     return $ Source preC posC exprs
 
+-- ParseExpr
+
+parseExpr :: ParsecT String u Identity Expr
+parseExpr = parseIf <|> parseWhile  <|> parseExprAlloc <|> parseExprAssign
 
 
--- Parse Assignments
+-- parseIf
+parseIf :: ParsecT String u Identity Expr
+parseIf = do
+    _ <- pIf
+    _ <- parO
+    cond <- parseLogExp
+    _ <- parC
+    _ <- bracketO
+    exprs1 <- many parseExpr
+    _ <- bracketC
+    _ <- pElse
+    _ <- bracketO
+    exprs2 <- many parseExpr
+    _ <- bracketC
+    return $ ExprIf cond exprs1 exprs2
+
+-- parse while
+parseWhile :: ParsecT String u Identity Expr
+parseWhile = do
+    _ <- while
+    _ <- parO
+    cond <-  parseLogExp
+    _ <- parC
+    _ <- bracketO
+    pinv <- parseInv
+    exprs <- many parseExpr
+    _ <- bracketC
+    return $ ExprWhile cond pinv exprs
+
+
+-- parse Invariant
 
 parseInv :: ParsecT String u Identity LogExp
 parseInv = inv *> parseLogExp <* sep
 
+-- parse Pre condition
 parsePre :: ParsecT String u Identity LogExp
 parsePre = pre *> parseLogExp <* sep
 
+
+-- Parse post condition
 parsePos :: ParsecT String u Identity LogExp
 parsePos = pos *> parseLogExp <* sep
 
 
-parseExpr :: ParsecT String u Identity Expr
-parseExpr = parseIf <|> parseWhile <|> parseExprAssign
+-- Parse Alloc
 
-parseWhile :: ParsecT String u Identity Expr
-parseWhile = do
-    while
-    parO
-    cond <-  parseLogExp
-    parC
-    bracketO
-    inv <- parseInv
-    exprs <- many parseExpr
-    bracketC
-    return $ ExprWhile cond inv exprs
+parseExprAlloc :: ParsecT String u Identity Expr
+parseExprAlloc = liftM ExprAlloc parseAlloc
 
+parseAlloc :: ParsecT String u Identity Alloc
+parseAlloc = (try parseANArray <|> parseNVar ) <* sep
 
+parseNVar :: ParsecT String u Identity Alloc
+parseNVar = pVar *> liftM NVar symbol
 
-parseIf :: ParsecT String u Identity Expr
-parseIf = do
-    pIf
-    parO
-    cond <- parseLogExp
-    parC
-    bracketO
-    exprs1 <- many parseExpr
-    bracketC
-    pElse
-    bracketO
-    exprs2 <- many parseExpr
-    bracketC
-    return $ ExprIf cond exprs1 exprs2
+parseANArray :: ParsecT String u Identity Alloc
+parseANArray = do
+    _ <- pVar
+    name <- symbol
+    _ <- squareO
+    size <- integer
+    _ <- squareC
+    return $ ANArray name size
+
+-- ParseAssign
 
 parseExprAssign :: ParsecT String u Identity Expr
-parseExprAssign = liftM ExprAssign parseAssign <* sep
+parseExprAssign = liftM ExprAssign parseAssign
 
 parseAssign :: ParsecT String u Identity Assign
-parseAssign = do
-    name <- symbol
-    maybeArray <- parseMaybeArray
-    case maybeArray of
-        Nothing -> parseAssignVar name
-        Just pos -> parseAssignArray name pos
-
-parseMaybeArray :: ParsecT String u Identity (Maybe Int)
-parseMaybeArray = optionMaybe $ squareO *> integer <* squareC
-
-parseAssignVar :: String ->  ParsecT String u Identity Assign
-parseAssignVar name = do
-    eq
-    aExp <- parseAExp
-    return $ AssignVar name aExp
+parseAssign =
+            ( try parseAssignVar 
+          <|> try parseAssignIntArray
+          <|> parseAssignVarArray )
+          <* sep
+parseAssignVar :: ParsecT String u Identity Assign
+parseAssignVar = do
+    var <- symbol
+    _ <- eq
+    aexp <- parseAExp
+    return $ AssignVar var aexp
 
 
-
-parseAssignArray :: String -> Int -> ParsecT String u Identity Assign
-parseAssignArray name pos = do
-    mEq <- optionMaybe eq
-    case mEq of
-        Nothing -> return $ AssignArray name pos None -- Criação de array
-        Just _ -> liftM  (AssignArray name pos) parseArrayVal -- Valor do array
-
-
-parseArrayVal :: ParsecT String u Identity ArrayVal
-parseArrayVal  = parseVarElem  <|> parseValArray <|> parseNArray
+parseAssignIntArray :: ParsecT String u Identity Assign
+parseAssignIntArray = do
+    var <- symbol
+    _ <- squareO
+    position <- integer
+    _ <- squareC
+    _ <- eq
+    aexp <- parseAExp
+    return $  AssignIntArray var position aexp
 
 
-parseNArray :: ParsecT String u Identity ArrayVal
-parseNArray = bracketO
-           *> liftM NArray (sepBy integer vig)
-           <* bracketC
-
-
-
-
-parseValArray :: ParsecT String u Identity ArrayVal
-parseValArray = do
-    name <- symbol
-    squareO
-    pos <- integer
-    squareC
-    return $  ValArray name pos
-
-parseVarElem :: ParsecT String u Identity ArrayVal
-parseVarElem = liftM ValElem integer
-
-
-
-
-
+parseAssignVarArray :: ParsecT String u Identity Assign
+parseAssignVarArray = do
+    var <- symbol
+    _ <- squareO
+    position <- symbol
+    _ <- squareC
+    _ <- eq
+    aexp <- parseAExp
+    return $  AssignVarArray var position aexp
 
 -- Parse LogExp
 
@@ -139,7 +149,8 @@ parseLogExp = buildExpressionParser logExpTable logExpFactor
 
 
 logExpTable :: [[Operator String u Identity LogExp]]
-logExpTable  = [ [ Prefix (pNot >> return Not) ]
+logExpTable  = [ [ Prefix parseForall, Prefix parseExists]
+               , [ Prefix (pNot >> return Not) ]
                , [ Infix (liftM LogBin parseImp) AssocLeft]
                , [ Infix (liftM LogBin parseAnd) AssocLeft]
                , [ Infix (liftM LogBin parseOr) AssocLeft]
@@ -163,15 +174,15 @@ parseIneBin = do
 
 
 
--- parse IneOp
 
+-- parse IneOp
 parseIneOp :: ParsecT String u Identity IneOp
-parseIneOp = Prim.try parseEqual
-       <|> Prim.try parseLeq
-       <|> Prim.try parseGeq
-       <|> Prim.try parseDiff
-       <|> Prim.try parseLt
-       <|> parseGt
+parseIneOp = try parseEqual
+         <|> try parseLeq
+         <|> try parseGeq
+         <|> try parseDiff
+         <|> try parseLt
+         <|> parseGt
 
 
 parseEqual :: ParsecT String u Identity IneOp
@@ -193,9 +204,8 @@ parseGeq :: ParsecT String u Identity IneOp
 parseGeq = geq *> return Geq
 
 
-
-
 -- parse LogOp
+
 parseImp :: ParsecT String u Identity LogOp
 parseImp = pImp *> return Imp
 
@@ -204,6 +214,23 @@ parseAnd = pAnd *> return And
 
 parseOr :: ParsecT String u Identity LogOp
 parseOr = pOr *> return Or
+
+parseForall :: ParsecT String u Identity (LogExp -> LogExp)
+parseForall = do
+    _ <- forall
+    _ <- char ':'
+    var <- symbol
+    _ <- char ','
+    return $ Forall  var
+
+parseExists :: ParsecT String u Identity (LogExp -> LogExp)
+parseExists = do
+    _ <- exists
+    _ <- char ':'
+    var <- symbol
+    _ <- char ','
+    return $ Exists  var
+
 
 -- Parse Boolean
 
@@ -220,7 +247,9 @@ parseFalse :: ParsecT String u Identity Bool
 parseFalse = false *> return False
 
 
--- ParseAExp
+
+--- Parse AExp
+
 parseAExp :: ParsecT String u Identity AExp
 parseAExp = buildExpressionParser aExpTable aExpFactor
 
@@ -231,13 +260,17 @@ aExpTable = [ [ Infix (liftM AExp parseMul ) AssocLeft
               , Infix (liftM AExp parseSub) AssocLeft]
             ]
 aExpFactor :: ParsecT String u Identity AExp
-aExpFactor = parseExpPar <|> parseSVal
+aExpFactor = parseExpPar <|> parseSAValue
 
 parseExpPar :: ParsecT String u Identity AExp
 parseExpPar = parO *> parseAExp <* parC
 
-parseSVal :: ParsecT String u Identity AExp
-parseSVal = liftM SValue parseAVal
+parseSAValue :: ParsecT String u Identity AExp
+parseSAValue= liftM SAValue parseVarValue
+
+
+
+-- Parse AOp
 
 parseSum :: ParsecT String u Identity AOp
 parseSum = Aux.sum *> return Add
@@ -251,24 +284,49 @@ parseMul = mul *> return Mul
 parseDiv :: ParsecT String u Identity AOp
 parseDiv = Aux.div *> return Div
 
-
-parseAVal :: ParsecT String u Identity AValue
-parseAVal = parseANum <|> parseAVarArr
-
-parseANum :: ParsecT String u Identity AValue
-parseANum = liftM ANum integer
-
-parseAVarArr :: ParsecT String u Identity AValue
-parseAVarArr = do
-    symb <- symbol
-    arr <- optionMaybe parseMArr
-    case arr of
-        Nothing -> return $ AVar symb
-        Just val -> return $ AArray symb val
+parseMod :: ParsecT String u Identity AOp
+parseMod = Aux.mod *> return Mod
 
 
-parseMArr :: ParsecT String u Identity Int
-parseMArr = squareO *> integer <* squareC
+
+
+-- Function that parses a VarValue
+parseVarValue :: ParsecT String u Identity VarValue
+parseVarValue = parseVNum 
+            <|> try parseVIArray 
+            <|> try parseVVArray
+            <|> try parseNArray
+            <|> parseVVar
+
+-- Functions to auxiliate the Parsing of  a VarValue
+
+parseVNum :: ParsecT String u Identity VarValue
+parseVNum = liftM VVNum integer
+
+parseVVar :: ParsecT String u Identity VarValue
+parseVVar = liftM VVar symbol
+
+parseVIArray :: ParsecT String u Identity VarValue
+parseVIArray = do
+    name <- symbol
+    _ <- squareO
+    position <- integer
+    _ <- squareC
+    return $ VIArray name position
+
+parseVVArray :: ParsecT String u Identity VarValue
+parseVVArray = do
+    name <- symbol
+    _ <- squareO
+    position <- symbol
+    _ <- squareC
+    return $ VVArray name position
+
+parseNArray :: ParsecT String u Identity VarValue
+parseNArray =  bracketO
+           *> liftM NArray (sepBy integer vig)
+           <* bracketC
+
 
 
 clearS :: String -> String

@@ -1,5 +1,4 @@
 module VCGen where
-
 import           Data.Set (Set)
 import qualified Data.Set as Se
 import           Syntax
@@ -24,7 +23,6 @@ vcaux [] _ = Se.empty
 vcaux (x:xs) cond = Se.union (vcaux' x (wp xs cond)) (vcaux xs cond)
 
 
-
 vcaux' :: Expr -> LogExp -> Set LogExp
 vcaux' (ExprIf _ expr1 expr2) cond =
   Se.union (vcaux expr1 cond) (vcaux expr2 cond)
@@ -44,6 +42,9 @@ wp' :: Expr -> LogExp -> LogExp
 wp' (ExprAssign assign) expr = wpAssign assign expr
 wp' (ExprIf cond exps1 exps2) expr = wpIf cond exps1 exps2 expr
 wp' (ExprWhile _ inv _) _ = inv
+wp' _ expr = expr
+
+
 
 
 -- calculation of weakest precondition If
@@ -53,54 +54,79 @@ wpIf cond exps1 exps2 conExp = LogBin And and1 and2
       where and1 = LogBin Imp cond $  wp exps1 conExp
             and2 = LogBin Imp (Not cond) $ wp exps2 conExp
 
+
 -- calculation of weakest precondition assign
 
 wpAssign :: Assign -> LogExp -> LogExp
-wpAssign (AssignVar nameVar condVar) pos = wpAVLogExp nameVar condVar pos
-wpAssign (AssignArray name npos val) posC = wpAALogExp name npos val posC
+wpAssign (AssignVar nameVar aexp) = wpAVLogExp nameVar aexp
+wpAssign (AssignIntArray nameArr pos aexp) = wpAIA nameArr pos aexp
+wpAssign (AssignVarArray nameArr pos aexp) = wpAVA nameArr pos aexp
+
+
+-- weakest pre condition Assignment Var Array
+
+wpAVA :: String -> String -> AExp -> LogExp -> LogExp
+wpAVA _ _ _ (BConst bool) = BConst bool
+wpAVA nameVar position aexp  (Forall str pos) = 
+    Forall str (wpAVA nameVar position aexp pos)
+wpAVA nameVar position aexp (Exists str pos) = 
+    Exists str (wpAVA nameVar position aexp pos)
+wpAVA nameVar position aexp (Not pos) = 
+    Not (wpAVA nameVar position aexp pos)
+wpAVA nameVar position aexp (LogBin op exp1 exp2) = LogBin op wpExp1 wpExp2
+                        where wpExp1 = wpAVA nameVar position aexp exp1
+                              wpExp2 = wpAVA nameVar position aexp exp2
+wpAVA nameVar position aexp (IneBin op exp1 exp2) = IneBin op wpIxp1 wpIxp2
+                        where wpIxp1 = wpAVVV nameVar position aexp exp1
+                              wpIxp2 = wpAVVV nameVar position aexp exp2
+
+
+wpAVVV :: String -> String -> AExp -> AExp -> AExp
+wpAVVV name pos aexp (SAValue (VVArray nameArr posArr )) 
+    | name == nameArr && pos == posArr = aexp
+    | otherwise = SAValue $ VVArray nameArr posArr
+wpAVVV _ _ _ (SAValue val) = SAValue val
+wpAVVV name pos aexp (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
+                where wpExp1 = wpAVVV name pos aexp exp1
+                      wpExp2 = wpAVVV name pos aexp exp2
 
 
 
---Weakest precondition Assignment Array
-wpAALogExp :: String -> Int -> ArrayVal -> LogExp -> LogExp
-wpAALogExp _ _ _ (BConst bool) = BConst bool
-wpAALogExp name pos val (Not expr) = Not (wpAALogExp name pos val expr)
 
-wpAALogExp name pos val (IneBin op exp1 exp2) = IneBin op wpIxp1 wpIxp2
-                        where wpIxp1 = wpAAAexp name pos val exp1
-                              wpIxp2 = wpAAAexp name pos val exp2
-wpAALogExp name pos val (LogBin op exp1 exp2) = LogBin op wpExp1 wpExp2
-                        where wpExp1 = wpAALogExp name pos val exp1
-                              wpExp2 = wpAALogExp name pos val exp2
+-- weakest pre condition Assignment Int Array
 
-
-wpAAAexp :: String -> Int -> ArrayVal -> AExp -> AExp
-wpAAAexp name pos val (SValue  avalue) = SValue $ wpAAAValue name pos val avalue
-wpAAAexp name pos val (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
-                        where wpExp1 = wpAAAexp name pos val exp1
-                              wpExp2 = wpAAAexp name pos val exp2
-
-wpAAAValue :: String -> Int -> ArrayVal -> AValue -> AValue
-wpAAAValue name pos val (AArray namePA posPA) = 
-  arrayValToAValue val name pos namePA posPA 
-wpAAAValue _ _ _ avalue = avalue
+wpAIA :: String -> Int -> AExp -> LogExp -> LogExp
+wpAIA _ _ _ (BConst bool) = BConst bool
+wpAIA nameVar position aexp  (Forall str pos) = 
+    Forall str (wpAIA nameVar position aexp pos)
+wpAIA nameVar position aexp (Exists str pos) = 
+    Exists str (wpAIA nameVar position aexp pos)
+wpAIA nameVar position aexp (Not pos) = 
+    Not (wpAIA nameVar position aexp pos)
+wpAIA nameVar position aexp (LogBin op exp1 exp2) = LogBin op wpExp1 wpExp2
+                        where wpExp1 = wpAIA nameVar position aexp exp1
+                              wpExp2 = wpAIA nameVar position aexp exp2
+wpAIA nameVar position aexp (IneBin op exp1 exp2) = IneBin op wpIxp1 wpIxp2
+                        where wpIxp1 = wpAIVV nameVar position aexp exp1
+                              wpIxp2 = wpAIVV nameVar position aexp exp2
 
 
-arrayValToAValue ::  ArrayVal -> String -> Int -> String -> Int -> AValue
-arrayValToAValue (ValArray str n) name pos namePA  posPA
-  | name == namePA && pos == posPA =  AArray str n
-  | otherwise = AArray namePA posPA
-arrayValToAValue (ValElem n)  name pos namePA posPA 
-  | name == namePA && pos == posPA = ANum n
-  | otherwise = AArray namePA posPA
-arrayValToAValue (NArray vals) name pos namePA posPA
-  | name == namePA && posPA <= pos = ANum (vals !! posPA)
-  | otherwise = ANum (-999)
-arrayValToAValue None _ _ namePA posPA = AArray namePA posPA
+wpAIVV :: String -> Int -> AExp -> AExp -> AExp
+wpAIVV name pos aexp (SAValue (VIArray nameArr posArr )) 
+    | name == nameArr && pos == posArr = aexp
+    | otherwise = SAValue $ VIArray nameArr posArr
+wpAIVV _ _ _ (SAValue val) = SAValue val
+wpAIVV name pos aexp (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
+                where wpExp1 = wpAIVV name pos aexp exp1
+                      wpExp2 = wpAIVV name pos aexp exp2
 
 --Weakest precondition Assignment Var
 wpAVLogExp :: String -> AExp -> LogExp -> LogExp
 wpAVLogExp _ _ (BConst bool) = BConst bool
+wpAVLogExp nameVar aexp (Forall str pos) = 
+    Forall str (wpAVLogExp nameVar aexp pos)
+wpAVLogExp nameVar aexp (Exists str pos) = 
+    Exists str (wpAVLogExp nameVar aexp pos)
 wpAVLogExp nameVar aexp (Not pos) = Not (wpAVLogExp nameVar aexp pos)
 wpAVLogExp nameVar aexp (LogBin op exp1 exp2) = LogBin op wpExp1 wpExp2
                         where wpExp1 = wpAVLogExp nameVar aexp exp1
@@ -110,13 +136,9 @@ wpAVLogExp nameVar aexp (IneBin op exp1 exp2) = IneBin op wpIxp1 wpIxp2
                               wpIxp2 = wpAVAExp nameVar aexp exp2
 
 wpAVAExp :: String -> AExp -> AExp -> AExp
-wpAVAExp nameVar aexp (SValue (AVar name))| nameVar == name = aexp
-                                          | otherwise = SValue $ AVar name
-wpAVAExp _ _ (SValue val) = SValue val
+wpAVAExp nameVar aexp (SAValue (VVar name))| nameVar == name = aexp
+                                           | otherwise = SAValue $ VVar name
+wpAVAExp _ _ (SAValue val) = SAValue val
 wpAVAExp nameVar aexp (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
                 where wpExp1 = wpAVAExp nameVar aexp exp1
                       wpExp2 = wpAVAExp nameVar aexp exp2
-
-
-
-
