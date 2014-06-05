@@ -15,9 +15,9 @@ teste =  forever $
 
 parseFile :: String -> IO (Either String Source)
 parseFile str = do
-    let result = Prim.parse parseSource "error.hs" $ clearS str
+    let result = Prim.parse parseSource "" $ clearS str
     case result of
-      Left err -> return $ Left $ show err
+      Left err -> return $ Left $ clearS str ++ " | " ++ show err
       Right val -> return $ Right val
 
 
@@ -149,11 +149,12 @@ parseLogExp = buildExpressionParser logExpTable logExpFactor
 
 
 logExpTable :: [[Operator String u Identity LogExp]]
-logExpTable  = [ [ Prefix parseForall, Prefix parseExists]
-               , [ Prefix (pNot >> return Not) ]
-               , [ Infix (liftM LogBin parseImp) AssocLeft]
+logExpTable  = [ [ Prefix (pNot >> return Not) ]
                , [ Infix (liftM LogBin parseAnd) AssocLeft]
                , [ Infix (liftM LogBin parseOr) AssocLeft]
+               , [ Infix (liftM LogBin parseImp) AssocLeft]
+               , [ Prefix parseForall, Prefix parseExists]
+
                ]
 
 
@@ -334,4 +335,5 @@ clearS [] = []
 clearS (x:xs) | x == ' ' = clearS xs
               | x == '\n' = clearS xs
               | x == '\t' = clearS xs
+              | x == '\r' = clearS xs
               | otherwise = x:clearS xs

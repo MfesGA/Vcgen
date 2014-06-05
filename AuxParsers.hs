@@ -104,7 +104,7 @@ pOr :: ParsecT String u Identity String
 pOr = string "||"
 
 pImp :: ParsecT String u Identity String
-pImp = string "imp"
+pImp = string ":->"
 
 pNot :: ParsecT String u Identity String
 pNot = string "~"

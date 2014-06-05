@@ -5,6 +5,7 @@ import qualified Data.Set          as Se
 import           Hsmtlib
 import           Hsmtlib.HighLevel as H
 import           Hsmtlib.Solver as Sl
+import           Hsmtlib.Parsers.Syntax  hiding(Source)
 import           Parser
 import           SMTLib2
 import           SMTLib2.Int
@@ -18,16 +19,16 @@ import           Control.Monad
 
 
 
-check :: Solver -> (String, Expr) -> IO SatResult
+check :: Solver -> (String, Expr) -> IO Result
 check solver (psexpr,sexpr) = do
     _ <- push solver 1
     _ <- assert solver $ not  sexpr
     val <- checkSat solver
     case val of
-        Unsat -> print $ "The condition: " ++ psexpr ++ " is valid."
-        SUError err -> print $ "Error: " ++ err
-        _ ->  putStrLn ("The condition: " ++ psexpr ++ " is not valid." ) >> 
-                askForModel solver
+        CCS Unsat -> print $ "The condition: " ++ psexpr ++ " is valid."
+        CCS _ ->  putStrLn ("The condition: " ++ psexpr ++ " is not valid." ) >> askForModel solver
+        (ComError err) -> print $ "Error: " ++ err
+        _ -> putStrLn "Error in Main.hs, function check!"
     _ <- pop solver 1 
     return val
  
@@ -47,18 +48,18 @@ askForModel' _ _ = print "Opção errada!"
 
 
 showValue :: Solver -> [String] -> IO ()
-showValue solver (x:[]) = getValue solver [constant x] >>= print
+showValue solver (x:[]) = getValue solver [ct x] >>= print
 showValue solver (x:y:[]) =
-    getValue solver [constant ("(select " ++ x ++ " " ++ y ++")")] >>= print
+    getValue solver [ct ("(select " ++ x ++ " " ++ y ++")")] >>= print
 showValue _ _ = print "Opção errada!"
 
 
-isValid :: [IO SatResult] -> IO ()
+isValid :: [IO Result] -> IO ()
 isValid [] = print "The program is valid"
 isValid (x:xs) = do
         val <- x
         case val of 
-            Unsat -> isValid xs
+            CCS Unsat -> isValid xs
             _ -> print "The program is not valid"
 
 showCV :: [(String,Expr)] -> IO ()
@@ -88,17 +89,17 @@ checkAll solver zipAsserts = isValid $ map (check solver) zipAsserts
 checkN :: Solver -> [(String, Expr)] -> Int -> IO ()
 checkN solver zips n = void $ check solver (zips !! n)
 
-runSolver :: Source -> IO String
+runSolver :: Source -> IO Result
 runSolver source = do
     let exprs = vcgen source
     let asserts = fmap createSexpr (Se.toList exprs) 
     let zipAsserts = zip (fmap  show (Se.toList exprs)) asserts
-    solver <- startSolver Z3 Online QF_AUFLIA Nothing Nothing
+    solver <- startSolver Z3 Online AUFLIA Nothing Nothing
     _ <- produceModels solver
-    -- declare constants
+    -- declare cts
     mapDeclConst solver (Se.toList.getVars $ exprs) tInt 
     -- declare arrays
-    mapDeclConst solver (Se.toList.getArrays $ source) (tArray tInt tInt)
+    mapDeclConst solver (Se.toList.getExpArrays $ exprs) (tArray tInt tInt)
     showAsserts solver zipAsserts
     --isValid $ map (check solver) zipAsserts
     -- assert Side Conditions

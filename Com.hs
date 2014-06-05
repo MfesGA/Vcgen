@@ -15,8 +15,12 @@ getAsserts :: Set LogExp -> Set SL.Expr
 getAsserts = Se.map createSexpr
 
 getVars :: Set LogExp -> Set String
-getVars = Se.foldr fun Se.empty
-        where fun =Se.union.getVarSexpr
+getVars = Se.foldr foo Se.empty
+        where foo = Se.union.getVarSexpr
+
+getExpArrays :: Set LogExp -> Set String
+getExpArrays = Se.foldr foo Se.empty
+        where foo = Se.union.getArraySexpr
 
 getArrays :: Source -> Set String
 getArrays (Source _ _ stmts) = getArrayLExpr stmts
@@ -27,8 +31,8 @@ getArrays (Source _ _ stmts) = getArrayLExpr stmts
 createSexpr :: LogExp -> SL.Expr
 createSexpr (BConst b) = boolToExpr b
 createSexpr (Not a) =  C.not (createSexpr a)
---createSexpr (Forall s expr) = forall s (creteSexpr expr)
---createSexpr (Exists s expr) = exists s (createSexpr expr)
+createSexpr (S.Forall s expr) = forall [bind s tInt] (createSexpr expr)
+createSexpr (S.Exists s expr) = exists [bind s tInt] (createSexpr expr)
 createSexpr (LogBin logop expr1 expr2) = logBinToExpr logop expr1 expr2
 createSexpr (IneBin ineop axp1 axp2) = ineBinToExpr ineop axp1 axp2
 
@@ -65,10 +69,10 @@ aOpToExpr Mod aexp1 aexp2 = nMod (aExpToExpr aexp1) (aExpToExpr aexp2)
 
 
 aValueToExpr :: VarValue -> SL.Expr
-aValueToExpr (VVNum n) = literal n
-aValueToExpr (VVar v) = constant v
-aValueToExpr (VIArray name pos) = select (constant name) (literal pos)
-aValueToExpr (VVArray name pos) = select (constant name) (constant pos)
+aValueToExpr (VVNum n) = lit n
+aValueToExpr (VVar v) = ct v
+aValueToExpr (VIArray name pos) = select (ct name) (lit pos)
+aValueToExpr (VVArray name pos) = select (ct name) (ct pos)
 
 
 -- Gets a Set of variables
@@ -94,10 +98,44 @@ getVarAexp (SAValue avalue) =
 
 getVarAvalue :: VarValue-> Set String
 getVarAvalue (VVar v) = Se.singleton v
+getVarAvalue (VIArray name pos) = Se.singleton (name ++ show pos)
+getVarAvalue (VVArray name pos) = Se.singleton (name ++ pos)
 getVarAvalue _ = Se.empty
 
 
---  Ges the  allocated arrays
+
+
+-- Get the arrays used in the vcs
+
+getArraySexpr :: LogExp -> Set String
+getArraySexpr (BConst _) = Se.empty
+getArraySexpr (Not a) =  getArraySexpr a
+getArraySexpr (S.Forall _ expr) = getArraySexpr expr
+getArraySexpr (S.Exists _ expr) = getArraySexpr expr
+getArraySexpr (LogBin _ expr1 expr2) =
+    Se.union (getArraySexpr expr1)  (getArraySexpr expr2)
+getArraySexpr (IneBin _ axp1 axp2) =
+    Se.union (getArrayAexp axp1) (getArrayAexp axp2)
+
+
+getArrayAexp :: AExp -> Set String
+getArrayAexp (AExp _ aexp1 aexp2) =
+    Se.union (getArrayAexp aexp1) (getArrayAexp aexp2)
+getArrayAexp (SAValue avalue) =
+    getArrayAvalue avalue
+
+
+
+getArrayAvalue :: VarValue-> Set String
+getArrayAvalue (VIArray name _) = Se.singleton name
+getArrayAvalue (VVArray name _) = Se.singleton name
+getArrayAvalue _ = Se.empty
+
+
+
+
+
+--  Gets the  allocated arrays
 
 getArrayLExpr :: [S.Expr] -> Set String
 getArrayLExpr = foldr (Se.union . getArrayExpr) Se.empty
@@ -113,6 +151,4 @@ getArrayExpr _ = Se.empty
 getArrayAlloc :: Alloc -> Set String
 getArrayAlloc (ANArray name _) = Se.singleton name
 getArrayAlloc _ = Se.empty
-
-
 
