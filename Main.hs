@@ -18,21 +18,89 @@ import           Prelude hiding (not)
 import           Control.Monad
 
 
+prompt :: IO ()
+prompt = putStr "> "
 
-check :: Solver -> (String, Expr) -> IO Result
-check solver (psexpr,sexpr) = do
+-- Inicializa o solver e faz as declarações
+declareConsts :: Source -> Handle -> IO (Solver, [LogExp], Handle)
+declareConsts source handle = do 
+    -- Inizializa o solver
+    solver <- startSolver Z3 Online AUFLIA Nothing Nothing
+    -- Coloco a flag para o solver produzir modelos
+    _ <- produceModels solver
+    let exprs = vcgen source -- calcula as condições de verificação
+    -- declare as constantes
+    mapDeclConst solver (Se.toList.getVars $ exprs) tInt 
+    -- declara os arays
+    mapDeclConst solver (Se.toList.getExpArrays $ exprs) (tArray tInt tInt)
+    return (solver, Se.toList exprs, handle)
+
+ 
+-- Interface que mostra as condições e as opções
+showConditions :: (Solver, [LogExp], Handle) -> IO (Solver, [LogExp], Handle)
+showConditions (solver, exprs, handle) = 
+    putStrLn "\n:: Verification Conditions\n" >>
+    showVC exprs >>
+    putStrLn "\nPara provar uma vc em particular insira o numero." >>
+    putStrLn "Para provar todas insira o numero 0.\n" >>
+    putStrLn "Para escolher outro ficheiro insira o numero -1.\n" >>
+    putStrLn "Para sair escolha o -2.\n" >>
+    return (solver, exprs, handle)
+
+
+-- Imprime as condições
+showVC :: [LogExp] -> IO ()
+showVC  = showVC' 1
+
+showVC' :: Int -> [LogExp] -> IO ()
+showVC' _ [] = return ()
+showVC' n (x:xs)= putStrLn (show n ++ " - " ++  show x) >> showVC' (n+1) xs
+
+
+
+-- Pede o input do utilizador
+getProveInput :: (Solver, [LogExp], Handle)->IO (Solver, [LogExp], Int, Handle)
+getProveInput (solver, exprs, handle) = do
+    prompt
+    val <-fmap read getLine
+    _ <- putStrLn ""
+    return (solver, exprs, val, handle)
+
+
+-- Realiza a operação pedida
+proveHowMany :: (Solver, [LogExp], Int, Handle) -> IO ()
+proveHowMany (solver, exprs, -2, handle) = exit solver >> hClose handle   
+proveHowMany (solver, exprs, -1, handle) =  hClose handle >> exit solver >> main
+proveHowMany (solver, exprs, 0, handle) = 
+    checkAll solver exprs >> body (solver, exprs, handle) >> return ()
+proveHowMany (solver, exprs, n, handle) = 
+    check solver (exprs !! (n-1)) >> body (solver, exprs, handle) >> return () 
+
+
+checkAll :: Solver -> [LogExp]  -> IO ()
+checkAll =  checkAll' 0 
+
+checkAll' :: Int -> Solver -> [LogExp] -> IO ()
+checkAll' n solver exprs 
+    | n == length exprs -1  = foo n >> return ()
+    | otherwise = foo n >> checkAll' (n+1) solver exprs 
+    where foo n = check solver (exprs !! n) 
+
+
+check :: Solver -> LogExp -> IO ()
+check solver expr = do
+    let sexpr = createSexpr expr
     _ <- push solver 1
-    _ <- assert solver $ not  sexpr
+    _ <- assert solver $ not sexpr
     val <- checkSat solver
     case val of
-        CCS Unsat -> print $ "The condition: " ++ psexpr ++ " is valid."
-        CCS _ ->  putStrLn ("The condition: " ++ psexpr ++ " is not valid." ) >> askForModel solver
+        CCS Unsat -> putStrLn $ "A condição: " ++ show expr ++ " é valida."
+        CCS _ ->  putStrLn ("The condition: " ++ show expr  ++ " is not valid." ) 
+                >> askForModel solver 
         (ComError err) -> print $ "Error: " ++ err
         _ -> putStrLn "Error in Main.hs, function check!"
-    _ <- pop solver 1 
-    return val
- 
-
+    _ <- pop solver 1
+    return ()
 
 askForModel :: Solver -> IO ()
 askForModel s = putStrLn "Deseja ver um contra exemplo? [y/n]" >>
@@ -54,70 +122,13 @@ showValue solver (x:y:[]) =
 showValue _ _ = print "Opção errada!"
 
 
-isValid :: [IO Result] -> IO ()
-isValid [] = print "The program is valid"
-isValid (x:xs) = do
-        val <- x
-        case val of 
-            CCS Unsat -> isValid xs
-            _ -> print "The program is not valid"
-
-showCV :: [(String,Expr)] -> IO ()
-showCV = showCV' 1
-
-showCV' :: Int -> [(String,Expr)] -> IO ()
-showCV' _ [] = return ()
-showCV' n ((x,_):xs) = putStr (show n ++ " -> " )>> putStrLn x >> showCV' (n+1) xs 
-
-showAsserts :: Solver -> [(String,Expr)] -> IO ()
-showAsserts solver zips =
-    putStrLn "\n:: Verification Conditions\n" >>
-    showCV zips >>
-    putStrLn "\nPara provar uma vc em particular insira o numero." >>
-    putStrLn "Para provar todas insira o numero 0.\n" >>
-    fmap read getLine >>= checkWhat solver zips
-
-
-checkWhat :: Solver -> [(String, Expr)] -> Int -> IO ()
-checkWhat solver zips 0 = checkAll solver zips
-checkWhat solver zips n = checkN solver zips (n-1)
-
-checkAll :: Solver -> [(String, Expr)] -> IO ()
-checkAll solver zipAsserts = isValid $ map (check solver) zipAsserts
-
-
-checkN :: Solver -> [(String, Expr)] -> Int -> IO ()
-checkN solver zips n = void $ check solver (zips !! n)
-
-runSolver :: Source -> IO Result
-runSolver source = do
-    let exprs = vcgen source
-    let asserts = fmap createSexpr (Se.toList exprs) 
-    let zipAsserts = zip (fmap  show (Se.toList exprs)) asserts
-    solver <- startSolver Z3 Online AUFLIA Nothing Nothing
-    _ <- produceModels solver
-    -- declare cts
-    mapDeclConst solver (Se.toList.getVars $ exprs) tInt 
-    -- declare arrays
-    mapDeclConst solver (Se.toList.getExpArrays $ exprs) (tArray tInt tInt)
-    showAsserts solver zipAsserts
-    --isValid $ map (check solver) zipAsserts
-    -- assert Side Conditions
-    exit solver
-
 
 
 
 
 -- Main
 main :: IO ()
-main = forever run
-
-prompt :: IO ()
-prompt = putStr "> "
-
-run :: IO ()
-run = putStrLn "Insira o caminho para o ficheiro." >>
+main = putStrLn "Insira o caminho para o ficheiro." >>
        prompt >> getLine  >>= runProgram
 
 
@@ -127,5 +138,16 @@ runProgram fpath = do
     file <- hGetContents fHandle >>= parseFile 
     case file of
         Left err -> print err >> hClose fHandle
-        Right source -> runSolver source >> hClose fHandle
+        Right source -> interface source fHandle
     putStr "\n\n"
+
+interface :: Source -> Handle -> IO ()
+interface src handle = 
+    declareConsts src handle >>= -- declara as condições e calcula as condições
+    body
+
+
+body :: (Solver, [LogExp], Handle) -> IO ()
+body =  proveHowMany -- Prova as pedidas
+    <=< getProveInput -- recebe o valor do utilizador
+    <=< showConditions -- Mostra as condições e prompt
