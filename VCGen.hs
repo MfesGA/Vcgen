@@ -138,8 +138,9 @@ wpAVLogExp nameVar aexp (IneBin op exp1 exp2) = IneBin op wpIxp1 wpIxp2
 wpAVAExp :: String -> AExp -> AExp -> AExp
 wpAVAExp nameVar aexp (SAValue (VVar name))| nameVar == name = aexp
                                            | otherwise = SAValue $ VVar name 
-wpAVAExp nameVar aexp (SAValue(VVArray name namePosArr))| nameVar == namePosArr = SAValue $ wpSAVAExp aexp  name
+wpAVAExp nameVar aexp  (SAValue(VVArray name namePosArr))| nameVar == namePosArr = SAValue $ wpSAVAExp aexp  name
                                                         | otherwise = SAValue $ VVArray name namePosArr
+
 
 wpAVAExp _ _ (SAValue val) = SAValue val
 wpAVAExp nameVar aexp (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
@@ -159,3 +160,5 @@ wpAVAExp nameVar aexp (AExp op exp1 exp2) = AExp op wpExp1 wpExp2
 wpSAVAExp :: AExp -> String -> VarValue
 wpSAVAExp (SAValue (VVNum n)) str = VIArray str n
 wpSAVAExp (SAValue (VVar st)) str = VVArray str st
+
+
