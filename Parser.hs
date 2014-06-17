@@ -9,6 +9,13 @@ import           Text.Parsec.Prim      as Prim hiding(try)
 import           Text.ParserCombinators.Parsec
 import           AuxParsers as Aux
 
+tryExp :: IO ()
+tryExp = do
+  line <-  getLine
+  case (parse parseLogExp "" (clearS line) ) of
+    Left err  -> print err
+    Right xs  -> print xs
+
 teste :: IO ()
 teste =  forever $ 
     getLine >>= readFile >>= parseTest parseSource.clearS >>= print
@@ -154,7 +161,6 @@ logExpTable  = [ [ Prefix (pNot >> return Not) ]
                , [ Infix (liftM LogBin parseOr) AssocLeft]
                , [ Infix (liftM LogBin parseImp) AssocLeft]
                , [ Prefix parseForall, Prefix parseExists]
-
                ]
 
 

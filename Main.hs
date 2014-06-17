@@ -26,7 +26,7 @@ declareConsts :: Source -> Handle -> IO (Solver, [LogExp], Handle)
 declareConsts source handle = do 
     -- Inizializa o solver
     solver <- startSolver Z3 Online AUFLIA Nothing Nothing
-    -- Coloco a flag para o solver produzir modelos
+    -- Coloca a flag para o solver produzir modelos
     _ <- produceModels solver
     let exprs = vcgen source -- calcula as condições de verificação
     -- declare as constantes
