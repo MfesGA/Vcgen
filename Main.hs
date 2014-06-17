@@ -94,7 +94,7 @@ check solver expr = do
     _ <- assert solver $ not sexpr
     val <- checkSat solver
     case val of
-        CCS Unsat -> putStrLn $ "A condição: " ++ show expr ++ " é valida."
+        CCS Unsat -> putStrLn $ "The condition: " ++ show expr ++ " is valid."
         CCS _ ->  putStrLn ("The condition: " ++ show expr  ++ " is not valid." ) 
                 >> askForModel solver 
         (ComError err) -> print $ "Error: " ++ err
