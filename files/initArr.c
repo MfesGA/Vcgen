@@ -3,9 +3,9 @@
 pre: n >=0  &&  o < n && o >= 0;
 
 while(o < n){
-    inv: 0 <= o && o <= n && (forall: k, k >=0 && k<n :-> a[k] == 0); 
+    inv: 0 <= o && o <= n && (forall: k, k >=0 && k<o :-> a[k] == 0); 
     a[o] = 0;
     o=o+1;
 }
 
-pos: o == n;
+pos: (forall: k, k >= 0 && k <n :-> a[k] == 0 );

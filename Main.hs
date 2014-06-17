@@ -104,14 +104,14 @@ check solver expr = do
 
 askForModel :: Solver -> IO ()
 askForModel s = putStrLn "Deseja ver um contra exemplo? [y/n]" >>
-               getChar >>= askForModel' s
+               getLine >>= askForModel' s
 
-askForModel' :: Solver -> Char -> IO ()
-askForModel' _ 'n' = return ()
-askForModel' s 'y' = putStrLn "Insira o nome da variavel." >>
-                   putStrLn "Insira a pos do array se for o caso." >>
-                   putStrLn "e.g.: a | x 2\n" >> 
-                   getLine >> getLine >>= showValue s.words
+askForModel' :: Solver -> String -> IO ()
+askForModel' _ "n" = return ()
+askForModel' s "y" = putStrLn "Insira o nome da variavel." >>
+                     putStrLn "Insira a pos do array se for o caso." >>
+                     putStrLn "e.g.: a | x 2\n" >> 
+                     getLine >>= showValue s.words
 askForModel' _ _ = print "Opção errada!"
 
 
